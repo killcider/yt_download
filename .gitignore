@@ -1,0 +1,24 @@
+.venv/
+build/
+dist/
+*.spec.bak
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Local/runtime state
+.omx/
+.codex/
+.agents/
+*.log
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local environment overrides
+.env
+.env.*
