@@ -40,6 +40,25 @@ The output is created under `dist/`.
 
 ## Creating the Windows Installer
 
+### Option 1: GitHub Actions
+
+You can create `YT-Download-Setup.exe` without installing uv or Inno Setup on your PC.
+
+1. Open the GitHub repository.
+2. Go to `Actions`.
+3. Select `Build Windows Installer`.
+4. Click `Run workflow`.
+5. Open the completed workflow run.
+6. Download the `YT-Download-Setup` artifact.
+
+The artifact contains:
+
+```text
+YT-Download-Setup.exe
+```
+
+### Option 2: Local Windows Build
+
 Windows installers should be built on Windows. From a Windows PowerShell terminal:
 
 ```powershell
