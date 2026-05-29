@@ -13,6 +13,12 @@ class DownloadCancelled(Exception):
     """Raised when the user stops the current download batch."""
 
 
+class DownloadFailed(Exception):
+    def __init__(self, failures: list[tuple[str, str]]) -> None:
+        super().__init__(f"{len(failures)} download(s) failed")
+        self.failures = failures
+
+
 ProgressCallback = Callable[[str, str, float | None], None]
 
 QUALITY_FORMATS = {
@@ -78,8 +84,7 @@ class YoutubeDownloader:
             raise DownloadCancelled
 
         if failures:
-            failed_list = "\n".join(f"- {url}: {message}" for url, message in failures)
-            raise RuntimeError(f"{len(failures)} download(s) failed:\n{failed_list}")
+            raise DownloadFailed(failures)
 
     def _download_one(self, url: str) -> None:
         options = {

@@ -24,7 +24,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from yt_downloader.downloader import DownloadCancelled, YoutubeDownloader, parse_urls
+from yt_downloader.downloader import (
+    DownloadCancelled,
+    DownloadFailed,
+    YoutubeDownloader,
+    parse_urls,
+)
 from yt_downloader.i18n import get_texts
 from yt_downloader.paths import default_download_dir, ensure_directory
 
@@ -45,6 +50,7 @@ class UrlProgress:
 class DownloadWorker(QObject):
     progress = Signal(str, str, object)
     failed = Signal(str)
+    download_failures = Signal(object)
     finished = Signal()
 
     def __init__(
@@ -66,6 +72,8 @@ class DownloadWorker(QObject):
             self.downloader.download_many(self.urls)
         except DownloadCancelled:
             self.failed.emit(self.download_stopped)
+        except DownloadFailed as exc:
+            self.download_failures.emit(exc.failures)
         except Exception as exc:
             self.failed.emit(str(exc))
         finally:
@@ -81,6 +89,7 @@ class MainWindow(QMainWindow):
         self.thread: QThread | None = None
         self.worker: DownloadWorker | None = None
         self.url_progress: dict[str, UrlProgress] = {}
+        self.failed_downloads: list[tuple[str, str]] = []
         self.texts = get_texts()
 
         self.setWindowTitle(self.texts["app_title"])
@@ -190,6 +199,7 @@ class MainWindow(QMainWindow):
         self.log_list.clear()
         self.progress_bar.setValue(0)
         self.url_progress = {url: UrlProgress() for url in urls}
+        self.failed_downloads = []
         self._log(self.texts["saving_to"].format(path=output_dir))
         self._log(self.texts["parallel_count"].format(count=self.concurrency_input.value()))
         self._log(self.texts["selected_quality"].format(quality=self.quality_input.currentText()))
@@ -205,6 +215,7 @@ class MainWindow(QMainWindow):
         self.thread.started.connect(self.worker.run)
         self.worker.progress.connect(self._on_progress)
         self.worker.failed.connect(self._on_failed)
+        self.worker.download_failures.connect(self._on_download_failures)
         self.worker.finished.connect(self._on_finished)
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
@@ -228,11 +239,29 @@ class MainWindow(QMainWindow):
     def _on_failed(self, message: str) -> None:
         self._log(self.texts["error"].format(message=message))
 
+    @Slot(object)
+    def _on_download_failures(self, failures: object) -> None:
+        self.failed_downloads = list(failures) if isinstance(failures, list) else []
+        for url, message in self.failed_downloads:
+            if url in self.url_progress:
+                self.url_progress[url].finished = True
+            self._log(self.texts["download_failed_item"].format(url=url, reason=message))
+
     @Slot()
     def _on_finished(self) -> None:
         self._set_busy(False)
         if self.url_progress and all(item.finished for item in self.url_progress.values()):
             self.progress_bar.setValue(100)
+        if self.failed_downloads:
+            success_count = max(0, len(self.url_progress) - len(self.failed_downloads))
+            self._log(
+                self.texts["summary_with_failures"].format(
+                    success=success_count,
+                    failed=len(self.failed_downloads),
+                )
+            )
+        elif self.url_progress:
+            self._log(self.texts["summary_success"].format(count=len(self.url_progress)))
         self._log(self.texts["done"])
 
     @Slot()

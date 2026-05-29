@@ -31,6 +31,9 @@ TRANSLATIONS = {
         "selected_quality": "Quality: {quality}",
         "stopping": "Stopping after the current yt-dlp operation responds...",
         "error": "Error: {message}",
+        "download_failed_item": "Failed: {url} | Reason: {reason}",
+        "summary_success": "Completed: {count} download(s) succeeded.",
+        "summary_with_failures": "Completed: {success} succeeded, {failed} failed.",
         "done": "Done.",
     },
     "ko": {
@@ -67,6 +70,9 @@ TRANSLATIONS = {
         "selected_quality": "화질: {quality}",
         "stopping": "현재 yt-dlp 작업이 응답하면 중지합니다...",
         "error": "오류: {message}",
+        "download_failed_item": "실패: {url} | 이유: {reason}",
+        "summary_success": "완료: {count}개 다운로드 성공.",
+        "summary_with_failures": "완료: {success}개 성공, {failed}개 실패.",
         "done": "완료.",
     },
 }

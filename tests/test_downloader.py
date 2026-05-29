@@ -3,6 +3,7 @@ from time import sleep
 
 from yt_downloader.downloader import (
     QUALITY_FORMATS,
+    DownloadFailed,
     YoutubeDownloader,
     normalize_quality,
     parse_urls,
@@ -46,6 +47,23 @@ def test_quality_formats_are_pixel_limited() -> None:
     assert "height<=1080" in QUALITY_FORMATS["1080p"]
     assert "height<=2160" in QUALITY_FORMATS["2160p"]
     assert normalize_quality("best") == "best"
+
+
+def test_download_many_raises_structured_failures(tmp_path) -> None:
+    downloader = YoutubeDownloader(tmp_path, lambda *_args: None)
+
+    def fake_download(url: str) -> None:
+        if url.endswith("/bad"):
+            raise RuntimeError("not available")
+
+    downloader._download_one = fake_download
+
+    try:
+        downloader.download_many(["https://example.test/good", "https://example.test/bad"])
+    except DownloadFailed as exc:
+        assert exc.failures == [("https://example.test/bad", "not available")]
+    else:
+        raise AssertionError("Expected DownloadFailed")
 
 
 def test_parse_urls_accepts_lines_and_whitespace() -> None:
