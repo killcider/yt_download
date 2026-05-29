@@ -118,6 +118,7 @@ class MainWindow(QMainWindow):
         self.quality_input = QComboBox()
         for quality_id, label_key in QUALITY_CHOICES:
             self.quality_input.addItem(self.texts[label_key], quality_id)
+        self.quality_input.setCurrentIndex(3)
         quality_row.addWidget(quality_label)
         quality_row.addWidget(self.quality_input)
         quality_row.addStretch(1)
