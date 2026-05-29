@@ -1,7 +1,12 @@
 from threading import Lock
 from time import sleep
 
-from yt_downloader.downloader import YoutubeDownloader, parse_urls
+from yt_downloader.downloader import (
+    QUALITY_FORMATS,
+    YoutubeDownloader,
+    normalize_quality,
+    parse_urls,
+)
 
 
 def test_downloader_runs_up_to_configured_parallel_limit(tmp_path) -> None:
@@ -29,6 +34,18 @@ def test_downloader_runs_up_to_configured_parallel_limit(tmp_path) -> None:
 def test_downloader_clamps_parallel_limit(tmp_path) -> None:
     assert YoutubeDownloader(tmp_path, lambda *_args: None, max_workers=0).max_workers == 1
     assert YoutubeDownloader(tmp_path, lambda *_args: None, max_workers=20).max_workers == 8
+
+
+def test_downloader_normalizes_quality(tmp_path) -> None:
+    assert YoutubeDownloader(tmp_path, lambda *_args: None, quality="1080p").quality == "1080p"
+    assert YoutubeDownloader(tmp_path, lambda *_args: None, quality="bad").quality == "720p"
+
+
+def test_quality_formats_are_pixel_limited() -> None:
+    assert "height<=720" in QUALITY_FORMATS["720p"]
+    assert "height<=1080" in QUALITY_FORMATS["1080p"]
+    assert "height<=2160" in QUALITY_FORMATS["2160p"]
+    assert normalize_quality("best") == "best"
 
 
 def test_parse_urls_accepts_lines_and_whitespace() -> None:

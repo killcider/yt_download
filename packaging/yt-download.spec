@@ -2,17 +2,18 @@
 
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 
 project_root = Path(SPECPATH).parent
 hiddenimports = collect_submodules("yt_dlp")
+datas = collect_data_files("imageio_ffmpeg")
 
 a = Analysis(
     [str(project_root / "src" / "yt_downloader" / "__main__.py")],
     pathex=[str(project_root / "src")],
     binaries=[],
-    datas=[],
+    datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},

@@ -6,6 +6,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 from PySide6.QtWidgets import (
     QApplication,
+    QComboBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -26,16 +27,29 @@ from yt_downloader.downloader import DownloadCancelled, YoutubeDownloader, parse
 from yt_downloader.i18n import get_texts
 from yt_downloader.paths import default_download_dir, ensure_directory
 
+QUALITY_CHOICES = [
+    ("720p", "quality_720p"),
+    ("1080p", "quality_1080p"),
+    ("2160p", "quality_2160p"),
+    ("best", "quality_best"),
+]
+
 
 class DownloadWorker(QObject):
     progress = Signal(str, str, object)
     failed = Signal(str)
     finished = Signal()
 
-    def __init__(self, urls: list[str], output_dir: Path, max_workers: int) -> None:
+    def __init__(
+        self,
+        urls: list[str],
+        output_dir: Path,
+        max_workers: int,
+        quality: str,
+    ) -> None:
         super().__init__()
         texts = get_texts()
-        self.downloader = YoutubeDownloader(output_dir, self.progress.emit, max_workers)
+        self.downloader = YoutubeDownloader(output_dir, self.progress.emit, max_workers, quality)
         self.urls = urls
         self.download_stopped = texts["download_stopped"]
 
@@ -99,6 +113,15 @@ class MainWindow(QMainWindow):
         concurrency_row.addWidget(self.concurrency_input)
         concurrency_row.addStretch(1)
 
+        quality_row = QHBoxLayout()
+        quality_label = QLabel(self.texts["quality"])
+        self.quality_input = QComboBox()
+        for quality_id, label_key in QUALITY_CHOICES:
+            self.quality_input.addItem(self.texts[label_key], quality_id)
+        quality_row.addWidget(quality_label)
+        quality_row.addWidget(self.quality_input)
+        quality_row.addStretch(1)
+
         button_row = QHBoxLayout()
         self.download_button = QPushButton(self.texts["download"])
         self.download_button.setObjectName("PrimaryButton")
@@ -125,6 +148,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.url_input)
         layout.addLayout(folder_row)
         layout.addLayout(concurrency_row)
+        layout.addLayout(quality_row)
         layout.addLayout(button_row)
         layout.addWidget(divider)
         layout.addWidget(status_label)
@@ -158,9 +182,15 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self._log(self.texts["saving_to"].format(path=output_dir))
         self._log(self.texts["parallel_count"].format(count=self.concurrency_input.value()))
+        self._log(self.texts["selected_quality"].format(quality=self.quality_input.currentText()))
 
         self.thread = QThread(self)
-        self.worker = DownloadWorker(urls, output_dir, self.concurrency_input.value())
+        self.worker = DownloadWorker(
+            urls,
+            output_dir,
+            self.concurrency_input.value(),
+            str(self.quality_input.currentData()),
+        )
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run)
         self.worker.progress.connect(self._on_progress)
@@ -204,6 +234,7 @@ class MainWindow(QMainWindow):
         self.url_input.setEnabled(not busy)
         self.folder_input.setEnabled(not busy)
         self.concurrency_input.setEnabled(not busy)
+        self.quality_input.setEnabled(not busy)
 
     def _log(self, message: str) -> None:
         self.log_list.addItem(message)
@@ -230,7 +261,7 @@ def apply_dark_theme(app: QApplication) -> None:
             color: #c5cad3;
             font-weight: 700;
         }
-        QPlainTextEdit, QLineEdit, QListWidget, QSpinBox {
+        QPlainTextEdit, QLineEdit, QListWidget, QSpinBox, QComboBox {
             background: #1b1f27;
             border: 1px solid #343a46;
             border-radius: 8px;

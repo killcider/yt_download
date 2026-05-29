@@ -27,6 +27,22 @@ https://youtu.be/...
 
 Press Enter to move to the next line and add another video link.
 
+## Quality Options
+
+The app supports these quality choices:
+
+- `720p`
+- `1080p`
+- `4K (2160p)`
+- `Best available`
+
+YouTube often provides 1080p and 4K as separate video/audio streams. The app bundles
+ffmpeg through `imageio-ffmpeg`, so users do not need to install ffmpeg separately.
+
+The selected quality is a maximum target. For example, `4K (2160p)` downloads up to
+4K when the video actually has a 4K source; otherwise yt-dlp falls back to the best
+available lower quality.
+
 ## Ubuntu / Linux Usage
 
 Install dependencies and run the app:

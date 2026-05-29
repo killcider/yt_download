@@ -5,6 +5,7 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from pathlib import Path
 from threading import Event
 
+import imageio_ffmpeg
 import yt_dlp
 
 
@@ -14,6 +15,17 @@ class DownloadCancelled(Exception):
 
 ProgressCallback = Callable[[str, str, float | None], None]
 
+QUALITY_FORMATS = {
+    "720p": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best",
+    "1080p": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]/best",
+    "2160p": "bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/best[height<=2160]/best",
+    "best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
+}
+
+
+def normalize_quality(quality: str) -> str:
+    return quality if quality in QUALITY_FORMATS else "720p"
+
 
 class YoutubeDownloader:
     def __init__(
@@ -21,10 +33,12 @@ class YoutubeDownloader:
         output_dir: Path,
         progress_callback: ProgressCallback,
         max_workers: int = 4,
+        quality: str = "720p",
     ) -> None:
         self.output_dir = output_dir
         self.progress_callback = progress_callback
         self.max_workers = max(1, min(max_workers, 8))
+        self.quality = normalize_quality(quality)
         self.cancel_requested = Event()
 
     def cancel(self) -> None:
@@ -69,7 +83,9 @@ class YoutubeDownloader:
 
     def _download_one(self, url: str) -> None:
         options = {
-            "format": "best[ext=mp4]/best",
+            "format": QUALITY_FORMATS[self.quality],
+            "ffmpeg_location": imageio_ffmpeg.get_ffmpeg_exe(),
+            "merge_output_format": "mp4",
             "noplaylist": True,
             "outtmpl": str(self.output_dir / "%(title).200B.%(ext)s"),
             "progress_hooks": [lambda status: self._handle_progress(url, status)],

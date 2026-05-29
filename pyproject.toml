@@ -5,6 +5,7 @@ description = "A simple dark desktop app for downloading YouTube videos."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "imageio-ffmpeg>=0.5",
     "PySide6>=6.7",
     "yt-dlp>=2025.1.15",
 ]
@@ -32,4 +33,3 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
-
