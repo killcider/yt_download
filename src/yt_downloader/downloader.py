@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Event
 
@@ -31,6 +32,50 @@ QUALITY_FORMATS = {
 
 def normalize_quality(quality: str) -> str:
     return quality if quality in QUALITY_FORMATS else "720p"
+
+
+@dataclass
+class ComponentProgress:
+    downloaded: float = 0.0
+    total: float | None = None
+
+
+@dataclass
+class AggregateProgress:
+    expected_total: float | None = None
+    components: dict[str, ComponentProgress] = field(default_factory=dict)
+
+    def update(self, key: str, downloaded: float, total: float | None) -> float | None:
+        component = self.components.setdefault(key, ComponentProgress())
+        component.downloaded = max(component.downloaded, downloaded)
+        component.total = total or component.total
+
+        if self.expected_total:
+            downloaded_total = sum(item.downloaded for item in self.components.values())
+            return min(100.0, downloaded_total / self.expected_total * 100)
+
+        component_percents = [
+            min(100.0, item.downloaded / item.total * 100)
+            for item in self.components.values()
+            if item.total
+        ]
+        if not component_percents:
+            return None
+        return sum(component_percents) / len(component_percents)
+
+
+def expected_total_bytes(info: dict) -> float | None:
+    requested_formats = info.get("requested_formats") or []
+    if requested_formats:
+        totals = [
+            item.get("filesize") or item.get("filesize_approx")
+            for item in requested_formats
+            if item.get("filesize") or item.get("filesize_approx")
+        ]
+        return float(sum(totals)) if totals else None
+
+    total = info.get("filesize") or info.get("filesize_approx")
+    return float(total) if total else None
 
 
 class YoutubeDownloader:
@@ -93,16 +138,19 @@ class YoutubeDownloader:
             "merge_output_format": "mp4",
             "noplaylist": True,
             "outtmpl": str(self.output_dir / "%(title).200B.%(ext)s"),
-            "progress_hooks": [lambda status: self._handle_progress(url, status)],
             "windowsfilenames": True,
             "quiet": True,
             "no_warnings": True,
         }
 
         with yt_dlp.YoutubeDL(options) as ydl:
+            info = ydl.extract_info(url, download=False)
+            aggregate = AggregateProgress(expected_total_bytes(info))
+            ydl.add_progress_hook(lambda status: self._handle_progress(url, status, aggregate))
             ydl.download([url])
+            self.progress_callback(url, "Finished", 100.0)
 
-    def _handle_progress(self, url: str, status: dict) -> None:
+    def _handle_progress(self, url: str, status: dict, aggregate: AggregateProgress) -> None:
         if self.cancel_requested.is_set():
             raise DownloadCancelled
 
@@ -110,7 +158,12 @@ class YoutubeDownloader:
         if state == "downloading":
             downloaded = status.get("downloaded_bytes") or 0
             total = status.get("total_bytes") or status.get("total_bytes_estimate")
-            percent = (downloaded / total * 100) if total else None
+            component_key = status.get("filename") or status.get("tmpfilename") or url
+            percent = aggregate.update(
+                str(component_key),
+                float(downloaded),
+                float(total) if total else None,
+            )
             speed = status.get("_speed_str", "").strip()
             eta = status.get("_eta_str", "").strip()
             detail = "Downloading"
@@ -121,8 +174,16 @@ class YoutubeDownloader:
             self.progress_callback(url, detail, percent)
         elif state == "finished":
             filename = Path(status.get("filename", "")).name
-            detail = f"Finished: {filename}" if filename else "Finished"
-            self.progress_callback(url, detail, 100.0)
+            component_key = status.get("filename") or status.get("tmpfilename") or url
+            downloaded = status.get("downloaded_bytes") or status.get("total_bytes") or 0
+            total = status.get("total_bytes") or status.get("total_bytes_estimate")
+            percent = aggregate.update(
+                str(component_key),
+                float(downloaded),
+                float(total) if total else None,
+            )
+            detail = f"Finished part: {filename}" if filename else "Finished part"
+            self.progress_callback(url, detail, percent)
 
 
 def parse_urls(text: str) -> list[str]:

@@ -3,8 +3,10 @@ from time import sleep
 
 from yt_downloader.downloader import (
     QUALITY_FORMATS,
+    AggregateProgress,
     DownloadFailed,
     YoutubeDownloader,
+    expected_total_bytes,
     normalize_quality,
     parse_urls,
 )
@@ -47,6 +49,25 @@ def test_quality_formats_are_pixel_limited() -> None:
     assert "height<=1080" in QUALITY_FORMATS["1080p"]
     assert "height<=2160" in QUALITY_FORMATS["2160p"]
     assert normalize_quality("best") == "best"
+
+
+def test_expected_total_bytes_sums_split_streams() -> None:
+    info = {
+        "requested_formats": [
+            {"filesize": 100},
+            {"filesize_approx": 25},
+        ]
+    }
+
+    assert expected_total_bytes(info) == 125
+
+
+def test_aggregate_progress_groups_video_and_audio_components() -> None:
+    progress = AggregateProgress(expected_total=125)
+
+    assert progress.update("video", 100, 100) == 80
+    assert progress.update("audio", 12.5, 25) == 90
+    assert progress.update("audio", 25, 25) == 100
 
 
 def test_download_many_raises_structured_failures(tmp_path) -> None:
