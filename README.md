@@ -2,6 +2,8 @@
 
 Dark desktop app for downloading one or more YouTube links.
 
+The app shows Korean UI on Korean systems and English UI everywhere else.
+
 ## Windows Installation
 
 If you already have the installer:
@@ -13,6 +15,17 @@ If you already have the installer:
 
 The installed app includes the required Python runtime and libraries. You do not need
 to install Python, uv, PySide6, yt-dlp, or other dependencies separately.
+
+## How to Add Links
+
+Paste one YouTube link per line.
+
+```text
+https://www.youtube.com/watch?v=...
+https://youtu.be/...
+```
+
+Press Enter to move to the next line and add another video link.
 
 ## Ubuntu / Linux Usage
 

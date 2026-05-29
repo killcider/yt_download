@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from yt_downloader.downloader import DownloadCancelled, YoutubeDownloader, parse_urls
+from yt_downloader.i18n import get_texts
 from yt_downloader.paths import default_download_dir, ensure_directory
 
 
@@ -33,15 +34,17 @@ class DownloadWorker(QObject):
 
     def __init__(self, urls: list[str], output_dir: Path, max_workers: int) -> None:
         super().__init__()
+        texts = get_texts()
         self.downloader = YoutubeDownloader(output_dir, self.progress.emit, max_workers)
         self.urls = urls
+        self.download_stopped = texts["download_stopped"]
 
     @Slot()
     def run(self) -> None:
         try:
             self.downloader.download_many(self.urls)
         except DownloadCancelled:
-            self.failed.emit("Download stopped.")
+            self.failed.emit(self.download_stopped)
         except Exception as exc:
             self.failed.emit(str(exc))
         finally:
@@ -56,8 +59,9 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.thread: QThread | None = None
         self.worker: DownloadWorker | None = None
+        self.texts = get_texts()
 
-        self.setWindowTitle("YT Download")
+        self.setWindowTitle(self.texts["app_title"])
         self.setMinimumSize(860, 620)
         self._build_ui()
         self._set_busy(False)
@@ -68,25 +72,26 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(28, 24, 28, 24)
         layout.setSpacing(18)
 
-        title = QLabel("YT Download")
+        title = QLabel(self.texts["app_title"])
         title.setObjectName("Title")
-        subtitle = QLabel("Paste one or more YouTube links and download them by video title.")
+        subtitle = QLabel(self.texts["subtitle"])
+        subtitle.setWordWrap(True)
         subtitle.setObjectName("Subtitle")
 
         self.url_input = QPlainTextEdit()
-        self.url_input.setPlaceholderText("https://www.youtube.com/watch?v=...\nhttps://youtu.be/...")
+        self.url_input.setPlaceholderText(self.texts["url_placeholder"])
         self.url_input.setMinimumHeight(150)
 
         folder_row = QHBoxLayout()
         self.folder_input = QLineEdit(str(default_download_dir()))
-        self.folder_input.setPlaceholderText("Download folder")
-        browse_button = QPushButton("Browse")
+        self.folder_input.setPlaceholderText(self.texts["download_folder"])
+        browse_button = QPushButton(self.texts["browse"])
         browse_button.clicked.connect(self._select_folder)
         folder_row.addWidget(self.folder_input, 1)
         folder_row.addWidget(browse_button)
 
         concurrency_row = QHBoxLayout()
-        concurrency_label = QLabel("Parallel downloads")
+        concurrency_label = QLabel(self.texts["parallel_downloads"])
         self.concurrency_input = QSpinBox()
         self.concurrency_input.setRange(1, 8)
         self.concurrency_input.setValue(4)
@@ -95,10 +100,10 @@ class MainWindow(QMainWindow):
         concurrency_row.addStretch(1)
 
         button_row = QHBoxLayout()
-        self.download_button = QPushButton("Download")
+        self.download_button = QPushButton(self.texts["download"])
         self.download_button.setObjectName("PrimaryButton")
         self.download_button.clicked.connect(self._start_download)
-        self.stop_button = QPushButton("Stop")
+        self.stop_button = QPushButton(self.texts["stop"])
         self.stop_button.clicked.connect(self._stop_download)
         button_row.addStretch(1)
         button_row.addWidget(self.stop_button)
@@ -108,7 +113,7 @@ class MainWindow(QMainWindow):
         divider.setFrameShape(QFrame.Shape.HLine)
         divider.setObjectName("Divider")
 
-        status_label = QLabel("Status")
+        status_label = QLabel(self.texts["status"])
         status_label.setObjectName("SectionLabel")
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
@@ -131,7 +136,7 @@ class MainWindow(QMainWindow):
     def _select_folder(self) -> None:
         selected = QFileDialog.getExistingDirectory(
             self,
-            "Select download folder",
+            self.texts["select_folder"],
             self.folder_input.text(),
         )
         if selected:
@@ -140,15 +145,19 @@ class MainWindow(QMainWindow):
     def _start_download(self) -> None:
         urls = parse_urls(self.url_input.toPlainText())
         if not urls:
-            QMessageBox.warning(self, "No links", "Paste at least one YouTube link.")
+            QMessageBox.warning(
+                self,
+                self.texts["no_links_title"],
+                self.texts["no_links_message"],
+            )
             return
 
         output_dir = ensure_directory(Path(self.folder_input.text()).expanduser())
         self.folder_input.setText(str(output_dir))
         self.log_list.clear()
         self.progress_bar.setValue(0)
-        self._log(f"Saving to: {output_dir}")
-        self._log(f"Parallel downloads: {self.concurrency_input.value()}")
+        self._log(self.texts["saving_to"].format(path=output_dir))
+        self._log(self.texts["parallel_count"].format(count=self.concurrency_input.value()))
 
         self.thread = QThread(self)
         self.worker = DownloadWorker(urls, output_dir, self.concurrency_input.value())
@@ -167,7 +176,7 @@ class MainWindow(QMainWindow):
     def _stop_download(self) -> None:
         if self.worker:
             self.worker.cancel()
-            self._log("Stopping after the current yt-dlp operation responds...")
+            self._log(self.texts["stopping"])
 
     @Slot(str, str, object)
     def _on_progress(self, url: str, message: str, percent: object) -> None:
@@ -177,12 +186,12 @@ class MainWindow(QMainWindow):
 
     @Slot(str)
     def _on_failed(self, message: str) -> None:
-        self._log(f"Error: {message}")
+        self._log(self.texts["error"].format(message=message))
 
     @Slot()
     def _on_finished(self) -> None:
         self._set_busy(False)
-        self._log("Done.")
+        self._log(self.texts["done"])
 
     @Slot()
     def _clear_thread(self) -> None:
