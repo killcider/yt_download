@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, Signal, Slot
@@ -33,6 +34,12 @@ QUALITY_CHOICES = [
     ("2160p", "quality_2160p"),
     ("best", "quality_best"),
 ]
+
+
+@dataclass
+class UrlProgress:
+    percent: float = 0.0
+    finished: bool = False
 
 
 class DownloadWorker(QObject):
@@ -73,6 +80,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.thread: QThread | None = None
         self.worker: DownloadWorker | None = None
+        self.url_progress: dict[str, UrlProgress] = {}
         self.texts = get_texts()
 
         self.setWindowTitle(self.texts["app_title"])
@@ -181,6 +189,7 @@ class MainWindow(QMainWindow):
         self.folder_input.setText(str(output_dir))
         self.log_list.clear()
         self.progress_bar.setValue(0)
+        self.url_progress = {url: UrlProgress() for url in urls}
         self._log(self.texts["saving_to"].format(path=output_dir))
         self._log(self.texts["parallel_count"].format(count=self.concurrency_input.value()))
         self._log(self.texts["selected_quality"].format(quality=self.quality_input.currentText()))
@@ -212,7 +221,7 @@ class MainWindow(QMainWindow):
     @Slot(str, str, object)
     def _on_progress(self, url: str, message: str, percent: object) -> None:
         if isinstance(percent, float | int):
-            self.progress_bar.setValue(max(0, min(100, int(percent))))
+            self._update_url_progress(url, float(percent))
         self._log(f"{message} | {url}")
 
     @Slot(str)
@@ -222,6 +231,8 @@ class MainWindow(QMainWindow):
     @Slot()
     def _on_finished(self) -> None:
         self._set_busy(False)
+        if self.url_progress and all(item.finished for item in self.url_progress.values()):
+            self.progress_bar.setValue(100)
         self._log(self.texts["done"])
 
     @Slot()
@@ -236,6 +247,14 @@ class MainWindow(QMainWindow):
         self.folder_input.setEnabled(not busy)
         self.concurrency_input.setEnabled(not busy)
         self.quality_input.setEnabled(not busy)
+
+    def _update_url_progress(self, url: str, percent: float) -> None:
+        progress = self.url_progress.setdefault(url, UrlProgress())
+        progress.percent = max(progress.percent, max(0.0, min(100.0, percent)))
+        progress.finished = progress.percent >= 100.0
+        total_percent = sum(item.percent for item in self.url_progress.values())
+        overall_percent = total_percent / max(1, len(self.url_progress))
+        self.progress_bar.setValue(max(0, min(100, int(overall_percent))))
 
     def _log(self, message: str) -> None:
         self.log_list.addItem(message)
