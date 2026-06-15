@@ -4,6 +4,7 @@ from time import sleep
 from yt_downloader.downloader import (
     QUALITY_FORMATS,
     SOCIAL_FORMAT,
+    YOUTUBE_EXTRACTOR_ARGS,
     AggregateProgress,
     DownloadFailed,
     MediaDownloader,
@@ -11,7 +12,9 @@ from yt_downloader.downloader import (
     expected_total_bytes,
     format_for_url,
     normalize_quality,
+    normalized_download_url,
     parse_urls,
+    youtube_video_id,
 )
 
 
@@ -70,6 +73,36 @@ def test_format_for_url_keeps_youtube_quality_and_uses_social_best() -> None:
     )
     assert format_for_url("https://www.tiktok.com/@user/video/123", "1080p") == SOCIAL_FORMAT
     assert format_for_url("https://www.instagram.com/reel/abc/", "2160p") == SOCIAL_FORMAT
+
+
+def test_youtube_video_id_accepts_watch_short_embed_and_share_urls() -> None:
+    assert youtube_video_id("https://www.youtube.com/watch?v=abc123&list=PL") == "abc123"
+    assert youtube_video_id("https://youtu.be/abc123?si=share") == "abc123"
+    assert youtube_video_id("https://www.youtube.com/shorts/abc123") == "abc123"
+    assert youtube_video_id("https://www.youtube.com/embed/abc123") == "abc123"
+    assert youtube_video_id("https://www.youtube-nocookie.com/embed/abc123") == "abc123"
+
+
+def test_normalized_download_url_uses_watch_url_for_youtube_only() -> None:
+    assert (
+        normalized_download_url("https://www.youtube.com/embed/abc123?start=10")
+        == "https://www.youtube.com/watch?v=abc123"
+    )
+    assert (
+        normalized_download_url("https://www.tiktok.com/@user/video/123")
+        == "https://www.tiktok.com/@user/video/123"
+    )
+
+
+def test_youtube_extractor_args_include_restricted_video_fallback_clients() -> None:
+    clients = YOUTUBE_EXTRACTOR_ARGS["youtube"]["player_client"]
+
+    assert "default" in clients
+    assert "web_embedded" in clients
+    assert "mweb" in clients
+    assert "android" in clients
+    assert "ios" in clients
+    assert "tv" in clients
 
 
 def test_expected_total_bytes_sums_split_streams() -> None:

@@ -5,7 +5,7 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Event
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import imageio_ffmpeg
 import yt_dlp
@@ -30,6 +30,11 @@ QUALITY_FORMATS = {
     "best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
 }
 SOCIAL_FORMAT = "best[ext=mp4]/best"
+YOUTUBE_EXTRACTOR_ARGS = {
+    "youtube": {
+        "player_client": ["default", "web_embedded", "mweb", "android", "ios", "tv"],
+    }
+}
 
 PLATFORM_DOMAINS = {
     "youtube": ("youtube.com", "youtu.be", "youtube-nocookie.com"),
@@ -57,6 +62,44 @@ def format_for_url(url: str, quality: str) -> str:
     if detect_platform(url) == "youtube":
         return QUALITY_FORMATS[normalize_quality(quality)]
     return SOCIAL_FORMAT
+
+
+def normalized_download_url(url: str) -> str:
+    if detect_platform(url) != "youtube":
+        return url
+
+    video_id = youtube_video_id(url)
+    if not video_id:
+        return url
+
+    query = urlencode({"v": video_id})
+    return urlunparse(("https", "www.youtube.com", "/watch", "", query, ""))
+
+
+def youtube_video_id(url: str) -> str | None:
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+
+    if host == "youtu.be":
+        return _first_path_part(parsed.path)
+
+    query = parse_qs(parsed.query)
+    if video_ids := query.get("v"):
+        return video_ids[0] or None
+
+    path_parts = [part for part in parsed.path.split("/") if part]
+    if host.endswith("youtube.com") or host.endswith("youtube-nocookie.com"):
+        if len(path_parts) >= 2 and path_parts[0] in {"embed", "shorts", "live"}:
+            return path_parts[1]
+
+    return None
+
+
+def _first_path_part(path: str) -> str | None:
+    parts = [part for part in path.split("/") if part]
+    return parts[0] if parts else None
 
 
 @dataclass
@@ -157,8 +200,9 @@ class MediaDownloader:
             raise DownloadFailed(failures)
 
     def _download_one(self, url: str) -> None:
+        download_url = normalized_download_url(url)
         options = {
-            "format": format_for_url(url, self.quality),
+            "format": format_for_url(download_url, self.quality),
             "ffmpeg_location": imageio_ffmpeg.get_ffmpeg_exe(),
             "merge_output_format": "mp4",
             "noplaylist": True,
@@ -167,12 +211,15 @@ class MediaDownloader:
             "quiet": True,
             "no_warnings": True,
         }
+        if detect_platform(download_url) == "youtube":
+            options["extractor_args"] = YOUTUBE_EXTRACTOR_ARGS
+            options["extractor_retries"] = 5
 
         with yt_dlp.YoutubeDL(options) as ydl:
-            info = ydl.extract_info(url, download=False)
+            info = ydl.extract_info(download_url, download=False)
             aggregate = AggregateProgress(expected_total_bytes(info))
             ydl.add_progress_hook(lambda status: self._handle_progress(url, status, aggregate))
-            ydl.download([url])
+            ydl.download([download_url])
             self.progress_callback(url, "Finished", 100.0)
 
     def _handle_progress(self, url: str, status: dict, aggregate: AggregateProgress) -> None:
