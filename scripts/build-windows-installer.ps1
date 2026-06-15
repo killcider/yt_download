@@ -24,12 +24,11 @@ Write-Host "Installing locked dependencies..."
 uv sync --all-groups
 
 Write-Host "Building bundled Windows app..."
-uv run pyinstaller packaging/yt-download.spec --noconfirm --clean
+uv run pyinstaller packaging/social-video-download.spec --noconfirm --clean
 
 Write-Host "Building one-click installer..."
 iscc packaging/windows-installer.iss
 
-$InstallerPath = Join-Path $ProjectRoot "dist\installer\YT-Download-Setup.exe"
+$InstallerPath = Join-Path $ProjectRoot "dist\installer\Social-Video-Download-Setup.exe"
 Write-Host ""
 Write-Host "Done: $InstallerPath"
-

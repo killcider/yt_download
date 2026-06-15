@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
 from yt_downloader.downloader import (
     DownloadCancelled,
     DownloadFailed,
-    YoutubeDownloader,
+    MediaDownloader,
     parse_urls,
 )
 from yt_downloader.i18n import get_texts
@@ -62,7 +62,7 @@ class DownloadWorker(QObject):
     ) -> None:
         super().__init__()
         texts = get_texts()
-        self.downloader = YoutubeDownloader(output_dir, self.progress.emit, max_workers, quality)
+        self.downloader = MediaDownloader(output_dir, self.progress.emit, max_workers, quality)
         self.urls = urls
         self.download_stopped = texts["download_stopped"]
 

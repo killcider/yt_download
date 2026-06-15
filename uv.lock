@@ -261,7 +261,7 @@ wheels = [
 ]
 
 [[package]]
-name = "yt-download"
+name = "social-video-download"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

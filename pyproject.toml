@@ -1,7 +1,7 @@
 [project]
-name = "yt-download"
+name = "social-video-download"
 version = "0.1.0"
-description = "A simple dark desktop app for downloading YouTube videos."
+description = "A simple dark desktop app for downloading YouTube, TikTok, and Instagram videos."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.scripts]
-yt-download = "yt_downloader.__main__:main"
+social-video-download = "yt_downloader.__main__:main"
 
 [dependency-groups]
 dev = [

@@ -3,10 +3,13 @@ from time import sleep
 
 from yt_downloader.downloader import (
     QUALITY_FORMATS,
+    SOCIAL_FORMAT,
     AggregateProgress,
     DownloadFailed,
-    YoutubeDownloader,
+    MediaDownloader,
+    detect_platform,
     expected_total_bytes,
+    format_for_url,
     normalize_quality,
     parse_urls,
 )
@@ -26,7 +29,7 @@ def test_downloader_runs_up_to_configured_parallel_limit(tmp_path) -> None:
         with lock:
             active -= 1
 
-    downloader = YoutubeDownloader(tmp_path, lambda *_args: None, max_workers=4)
+    downloader = MediaDownloader(tmp_path, lambda *_args: None, max_workers=4)
     downloader._download_one = fake_download
 
     downloader.download_many([f"https://example.test/{index}" for index in range(8)])
@@ -35,13 +38,13 @@ def test_downloader_runs_up_to_configured_parallel_limit(tmp_path) -> None:
 
 
 def test_downloader_clamps_parallel_limit(tmp_path) -> None:
-    assert YoutubeDownloader(tmp_path, lambda *_args: None, max_workers=0).max_workers == 1
-    assert YoutubeDownloader(tmp_path, lambda *_args: None, max_workers=20).max_workers == 8
+    assert MediaDownloader(tmp_path, lambda *_args: None, max_workers=0).max_workers == 1
+    assert MediaDownloader(tmp_path, lambda *_args: None, max_workers=20).max_workers == 8
 
 
 def test_downloader_normalizes_quality(tmp_path) -> None:
-    assert YoutubeDownloader(tmp_path, lambda *_args: None, quality="1080p").quality == "1080p"
-    assert YoutubeDownloader(tmp_path, lambda *_args: None, quality="bad").quality == "720p"
+    assert MediaDownloader(tmp_path, lambda *_args: None, quality="1080p").quality == "1080p"
+    assert MediaDownloader(tmp_path, lambda *_args: None, quality="bad").quality == "720p"
 
 
 def test_quality_formats_are_pixel_limited() -> None:
@@ -49,6 +52,24 @@ def test_quality_formats_are_pixel_limited() -> None:
     assert "height<=1080" in QUALITY_FORMATS["1080p"]
     assert "height<=2160" in QUALITY_FORMATS["2160p"]
     assert normalize_quality("best") == "best"
+
+
+def test_detect_platform_from_common_social_domains() -> None:
+    assert detect_platform("https://www.youtube.com/watch?v=abc") == "youtube"
+    assert detect_platform("https://youtu.be/abc") == "youtube"
+    assert detect_platform("https://vm.tiktok.com/abc") == "tiktok"
+    assert detect_platform("https://www.tiktok.com/@user/video/123") == "tiktok"
+    assert detect_platform("https://www.instagram.com/reel/abc/") == "instagram"
+    assert detect_platform("https://example.test/video") == "generic"
+
+
+def test_format_for_url_keeps_youtube_quality_and_uses_social_best() -> None:
+    assert (
+        format_for_url("https://www.youtube.com/watch?v=abc", "1080p")
+        == QUALITY_FORMATS["1080p"]
+    )
+    assert format_for_url("https://www.tiktok.com/@user/video/123", "1080p") == SOCIAL_FORMAT
+    assert format_for_url("https://www.instagram.com/reel/abc/", "2160p") == SOCIAL_FORMAT
 
 
 def test_expected_total_bytes_sums_split_streams() -> None:
@@ -71,7 +92,7 @@ def test_aggregate_progress_groups_video_and_audio_components() -> None:
 
 
 def test_download_many_raises_structured_failures(tmp_path) -> None:
-    downloader = YoutubeDownloader(tmp_path, lambda *_args: None)
+    downloader = MediaDownloader(tmp_path, lambda *_args: None)
 
     def fake_download(url: str) -> None:
         if url.endswith("/bad"):

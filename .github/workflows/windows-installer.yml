@@ -33,5 +33,5 @@ jobs:
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: YT-Download-Setup
-          path: dist/installer/YT-Download-Setup.exe
+          name: Social-Video-Download-Setup
+          path: dist/installer/Social-Video-Download-Setup.exe

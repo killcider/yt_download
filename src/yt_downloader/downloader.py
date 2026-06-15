@@ -5,6 +5,7 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Event
+from urllib.parse import urlparse
 
 import imageio_ffmpeg
 import yt_dlp
@@ -28,10 +29,34 @@ QUALITY_FORMATS = {
     "2160p": "bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/best[height<=2160]/best",
     "best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
 }
+SOCIAL_FORMAT = "best[ext=mp4]/best"
+
+PLATFORM_DOMAINS = {
+    "youtube": ("youtube.com", "youtu.be", "youtube-nocookie.com"),
+    "tiktok": ("tiktok.com",),
+    "instagram": ("instagram.com",),
+}
 
 
 def normalize_quality(quality: str) -> str:
     return quality if quality in QUALITY_FORMATS else "720p"
+
+
+def detect_platform(url: str) -> str:
+    host = (urlparse(url).hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+
+    for platform, domains in PLATFORM_DOMAINS.items():
+        if any(host == domain or host.endswith(f".{domain}") for domain in domains):
+            return platform
+    return "generic"
+
+
+def format_for_url(url: str, quality: str) -> str:
+    if detect_platform(url) == "youtube":
+        return QUALITY_FORMATS[normalize_quality(quality)]
+    return SOCIAL_FORMAT
 
 
 @dataclass
@@ -78,7 +103,7 @@ def expected_total_bytes(info: dict) -> float | None:
     return float(total) if total else None
 
 
-class YoutubeDownloader:
+class MediaDownloader:
     def __init__(
         self,
         output_dir: Path,
@@ -133,7 +158,7 @@ class YoutubeDownloader:
 
     def _download_one(self, url: str) -> None:
         options = {
-            "format": QUALITY_FORMATS[self.quality],
+            "format": format_for_url(url, self.quality),
             "ffmpeg_location": imageio_ffmpeg.get_ffmpeg_exe(),
             "merge_output_format": "mp4",
             "noplaylist": True,
@@ -194,3 +219,6 @@ def parse_urls(text: str) -> list[str]:
             continue
         urls.extend(part.strip() for part in value.split() if part.strip())
     return urls
+
+
+YoutubeDownloader = MediaDownloader

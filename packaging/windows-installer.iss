@@ -1,7 +1,7 @@
-#define MyAppName "YT Download"
+#define MyAppName "Social Video Download"
 #define MyAppVersion "0.1.0"
-#define MyAppPublisher "YT Download"
-#define MyAppExeName "YT Download.exe"
+#define MyAppPublisher "Social Video Download"
+#define MyAppExeName "Social Video Download.exe"
 
 [Setup]
 AppId={{F2D88792-56F7-4C16-8F80-0D84AF1C4374}
@@ -12,7 +12,7 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=..\dist\installer
-OutputBaseFilename=YT-Download-Setup
+OutputBaseFilename=Social-Video-Download-Setup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -26,7 +26,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-Source: "..\dist\YT Download\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\Social Video Download\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -34,4 +34,3 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
-
